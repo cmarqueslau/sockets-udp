@@ -1,3 +1,9 @@
+/*
+   Data de criação: 09/10/2026
+   Estudante: Gustavo Martins França
+   Definição da mensagem do protocolo
+*/
+
 package protocol
 
 type MessageType byte

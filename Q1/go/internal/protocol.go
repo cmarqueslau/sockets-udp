@@ -1,3 +1,9 @@
+/*
+   Data de criação: 09/10/2026
+   Estudante: Gustavo Martins França
+   Definição do protocolo comum entre linguagens
+*/
+
 package protocol
 
 import (
@@ -17,11 +23,11 @@ func NewProtocol(conn *net.UDPConn, dest *net.UDPAddr) *Protocol {
 	}
 }
 
-// ReadMessage reads a UDP datagram and returns the Message and the sender's address
+// ReadMessage reads a UDP datagram and returns the Message and the source's address
 func (p *Protocol) ReadMessage() (*Message, *net.UDPAddr, error) {
 	packageBuffer := make([]byte, MaxPackageSize)
 
-	n, sender, err := p.conn.ReadFromUDP(packageBuffer)
+	n, source, err := p.conn.ReadFromUDP(packageBuffer)
 
 	if err != nil {
 		return nil, nil, err
@@ -53,7 +59,7 @@ func (p *Protocol) ReadMessage() (*Message, *net.UDPAddr, error) {
 		MessageData: messageData,
 	}
 
-	return msg, sender, nil
+	return msg, source, nil
 }
 
 // WriteMessage formats the Message to bytes and sends it to the destination
@@ -73,7 +79,13 @@ func (p *Protocol) WriteMessage(req *Message, dest *net.UDPAddr) error {
 	packageBuffer[messageSizeIndex] = req.MessageSize
 	copy(packageBuffer[messageSizeIndex+1:], []byte(req.MessageData))
 
-	_, err := p.conn.WriteToUDP(packageBuffer, dest)
+	target := dest
+
+	if target == nil {
+		target = p.dest
+	}
+
+	_, err := p.conn.WriteToUDP(packageBuffer, target)
 
 	return err
 }
