@@ -1,12 +1,20 @@
-.PHONY: all run build clean
+.PHONY: all run-server run-client build-server build-client build clean
 
 all: build
 
-run:
-	go run ./cmd/chat
+run-server:
+	go run ./cmd/server
 
-build:
-	go build -o bin/chat ./cmd/chat
+run-client:
+	go run ./cmd/client
+
+build-server:
+	go build -o bin/server ./cmd/server
+
+build-client:
+	go build -o bin/client ./cmd/client
+
+build: build-server build-client
 
 clean:
 	rm -rf bin/
