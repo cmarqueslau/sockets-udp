@@ -29,14 +29,14 @@ public class Receptor implements Runnable {
                 if (!Main.active) {
                     break;
                 }
-                System.out.println("Erro ao receber: " + e.getMessage());
+                Style.showError("Erro ao receber: " + e.getMessage());
                 continue;
             }
 
             Message message = Protocol.decode(packet.getData(), packet.getLength());
 
             if (message == null) {
-                System.out.println("[Pacote invalido descartado]");
+                Style.showWarning("Pacote inválido descartado.");
                 continue;
             }
 
@@ -49,21 +49,15 @@ public class Receptor implements Runnable {
      */
     private void curateMessage(Message message, DatagramPacket packet) {
 
-        if (message.type == Protocol.TYPE_NORMAL) {
-            System.out.println(message.nickname + ": " + message.text);
-
-        } else if (message.type == Protocol.TYPE_EMOJI) {
-            System.out.println(message.nickname + " [emoji]: " + message.text);
-
-        } else if (message.type == Protocol.TYPE_URL) {
-            System.out.println(message.nickname + " [link]: " + message.text);
-
-        } else if (message.type == Protocol.TYPE_ECHO) {
+        if (message.type == Protocol.TYPE_ECHO) {
 
             if (Main.waitingEcho && message.nickname.equals(nickname)) {
                 Main.waitingEcho = false;
-                System.out.println("[ECHO] Usuário está ativo.");
+                Style.showInfo("ECHO: usuário está ativo.");
+
             } else {
+                Style.showReceived(message.nickname, message.type, message.text);
+
                 try {
                     byte[] copy = new byte[packet.getLength()];
                     for (int i = 0; i < packet.getLength(); i++) {
@@ -72,11 +66,14 @@ public class Receptor implements Runnable {
                     DatagramPacket reply = new DatagramPacket(
                             copy, copy.length, packet.getAddress(), packet.getPort());
                     socket.send(reply);
-                    System.out.println("[ECHO] Recebido de " + message.nickname + " (respondido).");
+                    Style.showInfo("ECHO respondido a " + message.nickname);
                 } catch (IOException e) {
-                    System.out.println("Erro ao responder ECHO: " + e.getMessage());
+                    Style.showError("Erro ao responder ECHO: " + e.getMessage());
                 }
             }
+        } else {
+            // Tipos 1 (normal), 2 (emoji) e 3 (URL): apenas exibe
+            Style.showReceived(message.nickname, message.type, message.text);
         }
     }
 }

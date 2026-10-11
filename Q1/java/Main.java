@@ -14,7 +14,7 @@ import java.util.Scanner;
  */
 public class Main {
 
-    public static final int ECHO_WAIT_TIME = 3000;
+    public static final int ECHO_WAIT_TIME = 10000;
 
     // Flags compartilhadas com a thread Receptor.
     public static volatile boolean active = true;
@@ -29,13 +29,18 @@ public class Main {
      * Mostra o texto de pergunta e lê uma linha digitada pelo usuário.
      */
     private static String readLine(String prompt) {
-        System.out.print(prompt);
+        Style.currentPrompt = Style.BOLD + prompt + Style.RESET;
+        System.out.print(Style.currentPrompt);
+        System.out.flush();
 
         if (!scanner.hasNextLine()) {
+            Style.currentPrompt = "";
             return null;
         }
 
-        return scanner.nextLine();
+        String line = scanner.nextLine();
+        Style.currentPrompt = "";
+        return line;
     }
 
     /**
@@ -43,22 +48,20 @@ public class Main {
      * Retorna -1 se a entrada foi encerrada e -2 se o valor for inválido.
      */
     private static int getType() {
-        System.out.println();
-        System.out.println("Tipo da mensagem:");
-        System.out.println("  1) Normal");
-        System.out.println("  2) Emoji");
-        System.out.println("  3) URL");
-        System.out.println("  4) ECHO (verifica se o outro esta ativo)");
-        System.out.println("  0) Sair");
-        System.out.println("\n");
-        String input = readLine("Escolha: ");
+        String input = readLine("Tipo: ");
 
         if (input == null) {
             return -1;
         }
 
+        input = input.trim();
+
+        if (input.equalsIgnoreCase("EXIT")) {
+            return 0;
+        }
+
         try {
-            return Integer.parseInt(input.trim());
+            return Integer.parseInt(input);
         } catch (NumberFormatException e) {
             return -2;
         }
@@ -91,7 +94,10 @@ public class Main {
     public static void main(String[] args) {
         try {
 
-            String typedNickname = readLine("Seu apelido (1 a 64 bytes): ");
+            Style.showInfo("Cliente iniciado");
+            Style.printLine(Style.GRAY + Style.SEPARATOR + Style.RESET);
+
+            String typedNickname = readLine("Seu apelido: ");
             if (typedNickname == null) {
                 return;
             }
@@ -99,7 +105,7 @@ public class Main {
 
             int nicknameSize = nickname.getBytes(StandardCharsets.UTF_8).length;
             if (nicknameSize < Protocol.NICKNAME_SIZE_MIN || nicknameSize > Protocol.NICKNAME_SIZE_MAX) {
-                System.out.println("[Erro] Apelido deve ter de 1 a 64 bytes.");
+                Style.showError("Apelido deve ter de 1 a 64 bytes.");
                 return;
             }
 
@@ -116,9 +122,12 @@ public class Main {
             InetAddress destIp = InetAddress.getByName(destIpText.trim());
 
             String destPortText = readLine("Porta destino: ");
+            Style.printLine(Style.GRAY + Style.SEPARATOR + Style.RESET);
+
             if (destPortText == null) {
                 return;
             }
+
             int destPort = Integer.parseInt(destPortText.trim());
 
             socket = new DatagramSocket(localPort);
@@ -126,9 +135,8 @@ public class Main {
             Thread receiverThread = new Thread(new Receptor(socket, nickname));
             receiverThread.start();
 
-            System.out.println();
-            System.out.println("[OK] Conectado como '" + nickname + "' (porta local " + localPort + ")");
-            System.out.println("[OK] Enviando para " + destIp.getHostAddress() + ":" + destPort);
+            Style.showInfo("Cliente iniciado na porta " + localPort);
+            Style.showInfo("Tipos de mensagens permitidos: 1 - Normal | 2 - Emoji | 3 - URL | 4 - ECHO | EXIT");
 
             while (active) {
                 int type = getType();
@@ -136,7 +144,7 @@ public class Main {
                 if (type == 0 || type == -1) {
                     active = false;
                 } else if (type < Protocol.TYPE_NORMAL || type > Protocol.TYPE_ECHO) {
-                    System.out.println("[Erro] Tipo inválido.");
+                    Style.showError("Tipo inválido. Use 1, 2, 3, 4 ou EXIT.");
                 } else {
                     String text;
 
@@ -153,11 +161,11 @@ public class Main {
                     int textSize = text.getBytes(StandardCharsets.UTF_8).length;
 
                     if (textSize == 0) {
-                        System.out.println("[Aviso] Mensagem vazia, nada foi enviado.");
+                        Style.showWarning("Mensagem vazia, nada foi enviado.");
                     } else if (textSize > Protocol.MESSAGE_SIZE_MAX) {
-                        System.out.println("[Erro] Mensagem muito grande (maximo 255 bytes).");
+                        Style.showError("Mensagem muito grande (máximo 255 bytes).");
                     } else if (type == Protocol.TYPE_URL && !isURLValid(text)) {
-                        System.out.println("[Erro] URL inválida (ex.: https://exemplo.com).");
+                        Style.showError("URL inválida (ex.: https://exemplo.com).");
                     } else {
                         byte[] data = Protocol.montarMensagem(type, nickname, text);
 
@@ -168,29 +176,30 @@ public class Main {
                         sendPacket(data, destIp, destPort);
 
                         if (type == Protocol.TYPE_ECHO) {
-                            System.out.println("[ECHO] Enviado, aguardando resposta...");
+                            Style.showSent(nickname, type, text);
+                            Style.showInfo("ECHO enviado, aguardando resposta...");
                             Thread.sleep(ECHO_WAIT_TIME);
                             if (waitingEcho) {
                                 waitingEcho = false;
-                                System.out.println("[ECHO] Sem resposta: usuário inativo.");
+                                Style.showWarning("ECHO sem resposta: usuário inativo.");
                             }
                         } else {
-                            System.out.println("[Enviado] " + nickname + ": " + text);
+                            Style.showSent(nickname, type, text);
                         }
                     }
                 }
             }
 
-            System.out.println("Encerrando o chat ...");
+            Style.showInfo("Chat encerrado.");
 
         } catch (NumberFormatException e) {
-            System.out.println("[Erro] Porta inválida: " + e.getMessage());
+            Style.showError("Porta inválida: " + e.getMessage());
         } catch (SocketException e) {
-            System.out.println("[Erro] Socket: " + e.getMessage());
+            Style.showError("Socket: " + e.getMessage());
         } catch (IOException e) {
-            System.out.println("[Erro] IO: " + e.getMessage());
+            Style.showError("IO: " + e.getMessage());
         } catch (InterruptedException e) {
-            System.out.println("[Erro] Interrompido: " + e.getMessage());
+            Style.showError("Interrompido: " + e.getMessage());
         } finally {
             active = false;
             /* Lança exceção para fechar a thread */
