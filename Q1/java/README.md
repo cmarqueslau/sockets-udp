@@ -10,7 +10,7 @@ Chat peer-to-peer desenvolvido em Java com sockets UDP que permite que dois clie
 
 | Arquivo | Descrição |
 |---|---|
-| `UDPPeerToPeer.java` | Classe principal: configuração do peer, menu e envio de mensagens |
+| `Main.java` | Classe principal: configuração do peer, menu e envio de mensagens |
 | `Receptor.java` | Thread que recebe e trata as mensagens |
 | `Protocolo.java` | Constantes do protocolo, montagem e decodificação das mensagens |
 | `Mensagem.java` | Classe que representa uma mensagem decodificada |
@@ -25,7 +25,7 @@ javac *.java
 
 ## Execução
 
-Abra **um terminal para cada peer** e execute em ambos:
+Abra um terminal para cada peer e execute em ambos:
 
 ```bash
 java Main
@@ -51,7 +51,7 @@ Use portas locais diferentes e aponte cada peer para a porta do outro:
 
 ### Conectando de outra máquina
 
-Em cada peer, informe como **IP destino** o IP da máquina do outro peer (por exemplo, `192.168.0.10`). Certifique-se de que a porta UDP usada não está bloqueada pelo firewall.
+Em cada peer, informe como IP destino o IP da máquina do outro peer (por exemplo, `192.168.0.10`). Certifique-se de que a porta UDP usada não está bloqueada pelo firewall.
 
 ## Formato da mensagem
 
@@ -65,7 +65,7 @@ Cada mensagem é enviada em um datagrama UDP com o seguinte formato:
 | Tamanho da mensagem (`tam_msg`) | 1 byte | Entre 0 e 255 |
 | Mensagem | `tam_msg` bytes | Conteúdo da mensagem (UTF-8) |
 
-Os tamanhos são contados em **bytes** e não em caracteres: acentos e emojis ocupam mais de 1 byte em UTF-8.
+Os tamanhos são contados em bytes e não em caracteres: acentos e emojis ocupam mais de 1 byte em UTF-8.
 
 ## Tipos de mensagem
 
@@ -74,16 +74,16 @@ Os tamanhos são contados em **bytes** e não em caracteres: acentos e emojis oc
 | `1` | Normal | Mensagem de texto comum | `apelido: mensagem` |
 | `2` | Emoji | Mensagem com emoji | `apelido [emoji]: mensagem` |
 | `3` | URL | Link (validado antes de enviar) | `apelido [link]: mensagem` |
-| `4` | ECHO | Verifica se o outro usuário está ativo | `[ECHO] Usuario esta ativo.` |
+| `4` | ECHO | Verifica se o outro usuário está ativo | `[ECHO] Usuario está ativo.` |
 
 ### Como funciona o ECHO
 
 1. O peer que quer testar envia uma mensagem do tipo `4`.
-2. Quem recebe devolve o **mesmo pacote** ao remetente, sem exibir mais nada além do aviso `[ECHO] Recebido de ...`.
+2. Quem recebe devolve o mesmo pacote ao remetente, sem exibir mais nada além do aviso `[ECHO] Recebido de ...`.
 3. Ao receber o pacote de volta, o remetente sabe que o outro usuário está ativo.
-4. Se não houver resposta em **3 segundos**, é exibido `[ECHO] Sem resposta: usuario inativo.`
+4. Se não houver resposta em 10 segundos, é exibido `[ECHO] Sem resposta: usuario inativo.`
 
-Para que o ECHO funcione corretamente, os dois peers devem usar **apelidos diferentes**.
+Para que o ECHO funcione corretamente, os dois peers devem usar apelidos diferentes.
 
 ## Menu de envio
 
@@ -95,7 +95,7 @@ Depois de configurado, o peer exibe um menu para escolher o tipo da mensagem:
 | `2` | Enviar emoji |
 | `3` | Enviar URL |
 | `4` | Enviar ECHO |
-| `0` | Sair (encerra o peer e fecha o socket) |
+| `0` | EXIT (encerra o peer e fecha o socket) |
 
 As mensagens recebidas aparecem no terminal onde o programa foi executado.
 
