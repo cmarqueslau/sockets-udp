@@ -4,7 +4,7 @@
    Definição do protocolo comum entre linguagens
 */
 
-package protocol
+package internal
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ func NewProtocol(conn *net.UDPConn, dest *net.UDPAddr) *Protocol {
 	}
 }
 
-// ReadMessage reads a UDP datagram and returns the Message and the source's address
+// Reads an UDP datagram and returns the Message and the source's address
 func (p *Protocol) ReadMessage() (*Message, *net.UDPAddr, error) {
 	packageBuffer := make([]byte, MaxPackageSize)
 
@@ -62,7 +62,7 @@ func (p *Protocol) ReadMessage() (*Message, *net.UDPAddr, error) {
 	return msg, source, nil
 }
 
-// WriteMessage formats the Message to bytes and sends it to the destination
+// Formats the Message to bytes and sends it to the destination
 func (p *Protocol) WriteMessage(req *Message, dest *net.UDPAddr) error {
 	if req.NickSize < 1 || req.NickSize > 64 {
 		return fmt.Errorf("Nick must be between 1 and 64 bytes")

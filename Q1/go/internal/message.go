@@ -4,7 +4,7 @@
    Definição da mensagem do protocolo
 */
 
-package protocol
+package internal
 
 type MessageType byte
 
