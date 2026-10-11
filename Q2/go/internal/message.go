@@ -8,6 +8,7 @@ package internal
 
 type CommandType byte
 type MessageType byte
+type SeqType uint32
 type Status uint8
 
 const (
@@ -17,6 +18,13 @@ const (
 	MessageData     MessageType = 0x04
 	MessageChecksum MessageType = 0x05
 	MessageACK      MessageType = 0x06
+)
+
+// might need to change request and header to be different
+const (
+	SeqRequest   SeqType = 0
+	SeqHeader    SeqType = 0
+	SeqFirstData SeqType = 1
 )
 
 const (
@@ -31,6 +39,7 @@ const (
 const (
 	MaxFileNameSize = 255
 	MaxPayloadSize  = 1024
+	HashSize        = 20 // SHA-1
 )
 
 type Message struct {
@@ -40,13 +49,11 @@ type Message struct {
 	// Response
 	StatusCode Status
 	// Header
-	NameSize uint8
 	FileSize uint64
 	FileName string
 	//Data
-	Seq         uint32 // reused for ACK
-	PayloadSize uint16
-	Payload     []byte
+	Seq     SeqType // reused for ACK
+	Payload []byte
 	// Checksum
-	Hash [20]byte
+	Hash [HashSize]byte
 }
