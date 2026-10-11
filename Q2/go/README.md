@@ -2,6 +2,8 @@
 
 Aplicação cliente-servidor desenvolvida em Go para a transferência de arquivos para um servidor UDP.
 
+Os arquivos enviados serão mantidos em `storage`.
+
 Os comandos executados em uma sessão serão registrados em `logs/server.log`.
 
 ## Dependências
