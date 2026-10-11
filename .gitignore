@@ -18,8 +18,6 @@
 # Logs
 *.log
 
-*.mod
-
 bin/
 downloads/
 logs/
