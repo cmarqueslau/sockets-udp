@@ -18,10 +18,10 @@
 # Logs
 *.log
 
-*.mod
-
 bin/
 downloads/
 logs/
 storage/
 users/
+uploads/
+out/
