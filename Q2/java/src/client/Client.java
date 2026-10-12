@@ -1,5 +1,5 @@
 /*
-   Data última atualização: 11/10/2026
+   Data última atualização: 12/10/2026
    Estudante: Maria Eduarda Bambini
    Cliente UDP de upload de arquivos (envia partes de 1024 bytes e o SHA-1 final)
 */
@@ -16,6 +16,7 @@ import common.Message.Header;
 import common.Message.Request;
 import common.Message.Response;
 import common.Message.Status;
+import common.Prompt;
 import common.Protocol;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,7 +46,7 @@ public class Client implements AutoCloseable {
     private static final int ACK_TIMEOUT_MS = 500;
     private static final int MAX_ATTEMPTS = 10;
 
-    /** É retornado uma Response em vez de um ACK (números de sequência reais nunca são negativos). */
+    /** É esperada uma Response em vez de um ACK (números de sequência reais nunca são negativos). */
     private static final long NO_ACK = -1;
 
     private final DatagramSocket socket;
@@ -52,27 +54,22 @@ public class Client implements AutoCloseable {
     private final SocketAddress server;
     private long retransmissions;
 
-    public Client(SocketAddress server, double dropRate) throws SocketException {
+    public Client(SocketAddress server) throws SocketException {
         this.server = server;
         this.socket = new DatagramSocket();
-        this.protocol = new Protocol(socket, dropRate);
+        this.protocol = new Protocol(socket);
     }
 
-    /**
-    * Faz o upload de um arquivo: requisição, cabeçalho, pacotes de dados de até 1024 bytes e o checksum SHA-1. 
-    * O digest é calculado enquanto o arquivo é lido; portanto, o arquivo é lido apenas uma vez. 
-    */
+    /* Faz o upload de um arquivo. */
     public boolean upload(Path file) throws IOException {
         if (!Files.isRegularFile(file)) {
             throw new NoSuchFileException(file.toString());
         }
 
         retransmissions = 0;
+        drainSocket();
 
-        if (sendForStatus(new Request(Command.ADD_FILE)) != Status.SUCCESS) {
-            throw new IOException("server refused the upload");
-        }
-
+        sendForAck(new Request(Command.ADD_FILE), REQUEST_SEQ);
         sendForAck(new Header(file.getFileName().toString(), Files.size(file)), HEADER_SEQ);
 
         MessageDigest sha1 = Protocol.newSha1();
@@ -99,6 +96,21 @@ public class Client implements AutoCloseable {
     @Override
     public void close() {
         socket.close();
+    }
+
+    /* Descarta datagramas atrasados de um upload anterior que ainda estejam no socket. */
+    private void drainSocket() throws IOException {
+        socket.setSoTimeout(1);
+
+        while (true) {
+            try {
+                protocol.receive();
+            } catch (SocketTimeoutException e) {
+                return;
+            } catch (ProtocolException e) {
+                // datagrama inválido
+            }
+        }
     }
 
     private Status sendForStatus(Message message) throws IOException {
@@ -151,26 +163,68 @@ public class Client implements AutoCloseable {
         };
     }
 
-    public static void main(String[] args) {
-        if (args.length < 3) {
-            System.err.println("usage: java client.UdpFileClient <host> <port> <file> [dropRate]");
-            System.exit(2);
-        }
-
-        InetSocketAddress server = new InetSocketAddress(args[0], Integer.parseInt(args[1]));
-        Path file = Paths.get(args[2]);
-        double dropRate = args.length > 3 ? Double.parseDouble(args[3]) : 0.0;
-
-        try (Client client = new Client(server, dropRate)) {
+    /* Envia um arquivo e mostra o resultado; um erro neste envio não encerra o programa. */
+    private static void uploadAndReport(Client client, Path file) {
+        try {
             long start = System.nanoTime();
             boolean stored = client.upload(file);
             long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
             System.out.println((stored ? "OK" : "FAILED (checksum rejected)") + " - " + file.getFileName()
                     + ", " + elapsedMs + " ms, " + client.retransmissions() + " retransmissions");
-            System.exit(stored ? 0 : 1);
         } catch (IOException e) {
             System.err.println("upload failed: " + e);
+        }
+    }
+
+    /* Pergunta o IP e a porta do servidor até receber um endereço válido; null se a entrada acabar. */
+    private static InetSocketAddress askServerAddress(Scanner input) {
+        while (true) {
+            String host = Prompt.ask(input, "IP do servidor", "127.0.0.1");
+            String port = Prompt.ask(input, "Porta", "5000");
+
+            if (host == null || port == null) {
+                return null;
+            }
+
+            try {
+                InetSocketAddress address = new InetSocketAddress(host, Integer.parseInt(port));
+
+                if (!address.isUnresolved()) {
+                    return address;
+                }
+
+                System.out.println("Servidor não encontrado: " + host);
+            } catch (IllegalArgumentException e) { // número inválido ou fora da faixa 0-65535
+                System.out.println("Porta inválida: " + port);
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner input = new Scanner(System.in);
+        InetSocketAddress server = askServerAddress(input);
+
+        if (server == null) {
+            return;
+        }
+
+        try (Client client = new Client(server)) {
+            System.out.println("Enviando para " + server + ".");
+
+            while (true) {
+                String file = Prompt.ask(input, "Arquivo para enviar (ou 'sair')", null);
+
+                if (file == null || file.equalsIgnoreCase("sair")) {
+                    break;
+                }
+
+                if (!file.isEmpty()) {
+                    uploadAndReport(client, Paths.get(file));
+                }
+            }
+        } catch (SocketException e) {
+            System.err.println("Não foi possível abrir o socket: " + e);
             System.exit(1);
         }
     }

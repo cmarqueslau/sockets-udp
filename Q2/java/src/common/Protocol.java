@@ -28,7 +28,6 @@ import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Random;
 
 /**
 * Formato de transmissão binária do protocolo sobre um socket UDP (os números estão em big-endian,
@@ -50,12 +49,9 @@ public class Protocol {
     public record Received(Message message, SocketAddress source) { }
 
     private final DatagramSocket socket;
-    private final double dropRate;
-    private final Random random = new Random();
-
-    public Protocol(DatagramSocket socket, double dropRate) {
+    
+    public Protocol(DatagramSocket socket) {
         this.socket = socket;
-        this.dropRate = dropRate;
     }
 
     /** Cria um resumo SHA-1. */
@@ -89,9 +85,6 @@ public class Protocol {
 
     /* Decodifica uma mensagem e a envia em um datagrama. */
     public void send(Message message, SocketAddress to) throws IOException {
-        if (dropRate > 0 && random.nextDouble() < dropRate) {
-            return;
-        }
 
         byte[] bytes = encode(message);
         socket.send(new DatagramPacket(bytes, bytes.length, to));
