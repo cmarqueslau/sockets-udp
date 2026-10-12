@@ -1,5 +1,5 @@
 /*
-   Data última atualização: 11/10/2026
+   Data última atualização: 12/10/2026
    Estudante: Maria Eduarda Bambini
    Servidor UDP de upload de arquivos (recebe partes de 1024 bytes e confere o SHA-1)
 */
@@ -15,6 +15,7 @@ import common.Message.Header;
 import common.Message.Request;
 import common.Message.Response;
 import common.Message.Status;
+import common.Prompt;
 import common.Protocol;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -30,8 +31,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
+import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -40,7 +44,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class Server implements AutoCloseable {
 
-    private static final int DEFAULT_PORT = 9000;
+    private static final int DEFAULT_PORT = 5000;
     private static final String DEFAULT_DIRECTORY = "uploads";
     private static final long MAX_FILE_SIZE = 1L << 30; // 1 GiB
     private static final long IDLE_TIMEOUT_MS = 15_000;
@@ -51,19 +55,20 @@ public class Server implements AutoCloseable {
     private final Path storageDir;
     private final Map<SocketAddress, Upload> uploads = new HashMap<>();
 
-    /**
-     * Vincula o socket e cria a pasta de armazenamento.
-    */
-    public Server(int port, Path storageDir, double dropRate) throws IOException {
+    /* Vincula o socket e cria a pasta de armazenamento. */
+    public Server(int port, Path storageDir) throws IOException {
         this.storageDir = storageDir.toAbsolutePath().normalize();
         Files.createDirectories(this.storageDir);
 
         this.socket = new DatagramSocket(port);
         this.socket.setSoTimeout(1000);
-        this.protocol = new Protocol(socket, dropRate);
+        this.protocol = new Protocol(socket);
     }
 
+    /** Loop de recebimento: executa até que {@link #close()} seja chamado. */
     public void run() throws IOException {
+        log("listening on UDP port " + socket.getLocalPort() + ", storing files in " + storageDir);
+
         try {
             while (true) {
                 try {
@@ -71,7 +76,8 @@ public class Server implements AutoCloseable {
                     handle(received.message(), received.source());
                 } catch (SocketTimeoutException e) {
                 } catch (ProtocolException e) {
-                    // datagrama inválido ou upload rejeitado (o cliente já foi notificado): segue atendendo
+                    // datagrama inválido ou upload rejeitado
+                    log(e.getMessage());
                 } catch (SocketException e) {
                     if (socket.isClosed()) {
                         return;
@@ -109,10 +115,10 @@ public class Server implements AutoCloseable {
     }
 
     /**
-     * Inicia um novo upload e responde com SUCESSO. Uma requisição repetida (resposta perdida)
-     * mantém o upload; uma requisição em qualquer outro estado significa que o cliente recomeçou. 
+    * Request: inicia um novo upload e responde com ACK(0). Um Request repetido (resposta perdida)
+    * mantém o upload; um Request em qualquer outro estado significa que o cliente recomeçou.
     */
-    private void onRequest(SocketAddress from) throws IOException {
+    private void onRequest(SocketAddress from) {
         Upload current = uploads.get(from);
 
         if (current == null || current.started || current.result != null) {
@@ -123,7 +129,7 @@ public class Server implements AutoCloseable {
             uploads.put(from, new Upload());
         }
 
-        send(from, new Response(Status.SUCCESS));
+        send(from, new Ack(REQUEST_SEQ));
     }
 
     /* Cabeçalho: valida nome e tamanho, abre o arquivo temporário e responde com ACK(0). */
@@ -165,6 +171,7 @@ public class Server implements AutoCloseable {
             return;
         }
 
+        log("receiving '" + header.fileName() + "' (" + header.fileSize() + " bytes) from " + from);
         send(from, new Ack(HEADER_SEQ));
     }
 
@@ -208,7 +215,7 @@ public class Server implements AutoCloseable {
     }
 
     /* Checksum: verifica o arquivo e responde SUCCESS ou ERROR. */
-    private void onChecksum(Checksum checksum, SocketAddress from) throws IOException {
+    private void onChecksum(Checksum checksum, SocketAddress from) {
         Upload upload = uploads.get(from);
 
         if (upload == null || (!upload.started && upload.result == null)) {
@@ -217,13 +224,7 @@ public class Server implements AutoCloseable {
         }
 
         if (upload.result == null) {
-            try {
-                finish(upload, checksum.hash());
-            } catch (ProtocolException e) {
-                reject(from, upload, e.getMessage());
-            } catch (IOException e) {
-                reject(from, upload, "could not store '" + upload.fileName + "': " + e.getMessage());
-            }
+            finish(upload, checksum.hash());
         }
 
         send(from, new Response(upload.result));
@@ -233,18 +234,32 @@ public class Server implements AutoCloseable {
      * Fecha o arquivo temporário e compara o SHA-1 calculado aqui com o enviado pelo
      * cliente. Apenas um arquivo completo com um hash correspondente recebe seu nome final; 
      * qualquer outra coisa é excluída, de modo que um arquivo corrompido nunca aparece na pasta de armazenamento. 
-    */
-    private void finish(Upload upload, byte[] expectedHash) throws IOException {
-        upload.out.close();
-        byte[] actualHash = upload.sha1.digest();
+     */
+    private void finish(Upload upload, byte[] expectedHash) {
+        boolean verified = false;
+        byte[] actualHash = null;
 
-        if (upload.received != upload.size || !MessageDigest.isEqual(actualHash, expectedHash)) {
-            throw new ProtocolException("discarded '" + upload.fileName + "': incomplete file or checksum mismatch");
+        try {
+            upload.out.close();
+            actualHash = upload.sha1.digest();
+
+            if (upload.received == upload.size && MessageDigest.isEqual(actualHash, expectedHash)) {
+                Files.move(upload.tempFile, upload.target, StandardCopyOption.REPLACE_EXISTING);
+                upload.tempFile = null; // moved: nothing left to delete
+                verified = true;
+            }
+        } catch (IOException e) {
+            log("could not store '" + upload.fileName + "': " + e.getMessage());
         }
 
-        Files.move(upload.tempFile, upload.target, StandardCopyOption.REPLACE_EXISTING);
-        upload.tempFile = null;
-        upload.result = Status.SUCCESS;
+        if (verified) {
+            log("stored '" + upload.fileName + "' (SHA-1 " + HexFormat.of().formatHex(actualHash) + ")");
+        } else {
+            log("discarded '" + upload.fileName + "': incomplete file or checksum mismatch");
+            upload.discard();
+        }
+
+        upload.result = verified ? Status.SUCCESS : Status.ERROR;
     }
 
     /* Aceita apenas um nome de arquivo simples que é armazenado diretamente na pasta de armazenamento, bloqueando diretórios ("../x", "a/b", caminhos absolutos, ".." e "."). */
@@ -278,11 +293,19 @@ public class Server implements AutoCloseable {
         });
     }
 
-    /** Envia uma mensagem, lançando uma exceção caso o socket falhe. */
-    private void send(SocketAddress to, Message message) throws IOException {
-        protocol.send(message, to);
+    /** Envia uma mensagem, registrando no log (em vez de lançar exceção) caso o socket falhe. */
+    private void send(SocketAddress to, Message message) {
+        try {
+            protocol.send(message, to);
+        } catch (IOException e) {
+            log("could not send to " + to + ": " + e.getMessage());
+        }
     }
-    
+
+    private static void log(String text) {
+        System.out.println("[" + LocalTime.now().withNano(0) + "] " + text);
+    }
+
     /**
      * Estado do upload de um cliente. Os dados vão para um arquivo temporário ".part" e só recebem
      * o nome final depois que o checksum for verificado.
@@ -328,11 +351,27 @@ public class Server implements AutoCloseable {
     }
 
     public static void main(String[] args) throws IOException {
-        int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
-        Path directory = Paths.get(args.length > 1 ? args[1] : DEFAULT_DIRECTORY);
-        double dropRate = args.length > 2 ? Double.parseDouble(args[2]) : 0.0;
+        Scanner input = new Scanner(System.in);
+        Server server;
 
-        Server server = new Server(port, directory, dropRate);
+        while (true) {
+            String port = Prompt.ask(input, "Porta", String.valueOf(DEFAULT_PORT));
+            String directory = Prompt.ask(input, "Pasta de armazenamento", DEFAULT_DIRECTORY);
+
+            if (port == null || directory == null) {
+                return;
+            }
+
+            try {
+                server = new Server(Integer.parseInt(port), Paths.get(directory));
+                break;
+            } catch (IllegalArgumentException e) {
+                System.out.println("Porta ou pasta inválida."); // número inválido, porta fora da faixa ou nome de pasta inválido
+            } catch (IOException e) {
+                System.out.println("Não foi possível iniciar o servidor: " + e.getMessage()); // ex.: porta em uso
+            }
+        }
+
         Runtime.getRuntime().addShutdownHook(new Thread(server::close));
         server.run();
     }

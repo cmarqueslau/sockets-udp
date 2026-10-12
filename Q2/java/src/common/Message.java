@@ -1,5 +1,5 @@
 /*
-   Data última atualização: 11/10/2026
+   Data última atualização: 12/10/2026
    Estudante: Maria Eduarda Bambini
    Definição das mensagens do protocolo
 */
@@ -19,6 +19,7 @@ public sealed interface Message {
     int MAX_PAYLOAD_SIZE = 1024;
     int HASH_SIZE = 20; // SHA-1
 
+    long REQUEST_SEQ = 0;
     long HEADER_SEQ = 0;
     long FIRST_DATA_SEQ = 1;
     long MAX_SEQ = 0xFFFFFFFFL;
@@ -27,7 +28,10 @@ public sealed interface Message {
     enum Status { SUCCESS, ERROR }
 
     record Request(Command command) implements Message { }
+
     record Response(Status status) implements Message { }
+
+    /** O cliente informa o nome (1 a 255 bytes em UTF-8) e o tamanho total do arquivo. */
     record Header(String fileName, long fileSize) implements Message {
         public Header {
             int nameLength = fileName.getBytes(StandardCharsets.UTF_8).length;
@@ -64,6 +68,6 @@ public sealed interface Message {
         }
     }
 
-    /** O servidor confirma o cabeçalho (seq 0) ou um pacote de dados (seu seq). */
+    /** O servidor confirma a requisição (seq 0), o cabeçalho (seq 0) ou um pacote de dados (seu seq). */
     record Ack(long seq) implements Message { }
 }
