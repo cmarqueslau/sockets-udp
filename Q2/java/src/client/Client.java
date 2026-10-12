@@ -46,7 +46,7 @@ public class Client implements AutoCloseable {
 
     private static final int ACK_TIMEOUT_MS = 500;
     private static final int MAX_ATTEMPTS = 10;
-    private static final String LOCAL_DIR = "arquivos-cliente";
+    private static final String LOCAL_DIR = "local";
 
     /** É esperada uma Response em vez de um ACK (números de sequência reais nunca são negativos). */
     private static final long NO_ACK = -1;
@@ -190,11 +190,18 @@ public class Client implements AutoCloseable {
     /* Pergunta o IP e a porta do servidor até receber um endereço válido; null se a entrada acabar. */
     private static InetSocketAddress askServerAddress(Scanner input) {
         while (true) {
-            String host = Prompt.ask(input, "IP do servidor", "127.0.0.1");
-            String port = Prompt.ask(input, "Porta", "5000");
+            String host = Prompt.ask(input, "IP do servidor", null);
+            String port = Prompt.ask(input, "Porta", null);
 
             if (host == null || port == null) {
                 return null;
+            }
+
+            if (host.isEmpty()) {
+                host = "127.0.0.1";
+            }
+            if (port.isEmpty()) {
+                port = "5000";
             }
 
             try {
@@ -205,7 +212,7 @@ public class Client implements AutoCloseable {
                 }
 
                 Style.showError("Servidor não encontrado: " + host);
-            } catch (IllegalArgumentException e) { // número inválido ou fora da faixa 0-65535
+            } catch (IllegalArgumentException e) {
                 Style.showError("Porta inválida: " + port);
             }
         }
