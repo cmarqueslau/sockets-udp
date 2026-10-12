@@ -30,11 +30,12 @@ public class Server
 
         string receiveDirectory =
             Environment.GetEnvironmentVariable("SERVER_RECEIVE_DIRECTORY")
-            ?? "./ReceivedFiles";
+            ?? "../uploads";
 
         Protocol protocol = new(
             udp,
-            receiveDirectory: "./ReceivedFiles");
+            null,
+            receiveDirectory);
 
         Log.Information("Servidor iniciado na porta {Port}.", port);
 

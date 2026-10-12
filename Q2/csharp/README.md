@@ -1,3 +1,5 @@
+Aluna: Caroline Marques Lau
+
 ## Sobre o programa
 
 Implementar um sistema cliente-servidor para transferência de arquivos utilizando o protocolo UDP em C#. Como o UDP não garante a entrega nem a ordem dos pacotes, o protocolo implementa confirmações (ACK), retransmissões e verificação de integridade por SHA-1.
@@ -14,6 +16,8 @@ Crie um arquivo `.env` com as configurações necessárias. Use o `.env.example`
 
 - `SERVER_RECEIVE_DIRECTORY`: diretório onde os arquivos recebidos serão salvos.
 - `CLIENT_SEND_DIRECTORY`: diretório dos arquivos disponíveis para envio.
+
+O cliente utiliza a variável CLIENT_SEND_DIRECTORY do arquivo .env para localizar e listar os arquivos disponíveis. Selecione um dos arquivos listados para iniciar a transferência.
 
 ## Restaurar dependências
 
