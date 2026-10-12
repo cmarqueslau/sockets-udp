@@ -52,6 +52,6 @@ O nome do arquivo é UTF-8 (até 255 bytes). O maior datagrama é o Data: 1 + 4 
 * O SHA-1 é calculado de forma incremental enquanto os dados chegam. No Checksum o servidor compara
   com o valor enviado pelo cliente; se for igual (e o tamanho bater com o do Header), o `.part` é
   renomeado para o nome final;
-* Nomes com `/`, `\`, `..` ou fora da pasta padrão são recusados (evita *path traversal*);
+* Nomes com `/`, `\`, `..` ou fora da pasta padrão são recusados;
 * Tamanho anunciado maior que 1 GiB é recusado, e dados além do tamanho anunciado abortam o upload;
 * Se já existir um arquivo com o mesmo nome, ele é substituído.
