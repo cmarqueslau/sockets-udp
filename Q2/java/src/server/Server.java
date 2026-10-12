@@ -17,6 +17,7 @@ import common.Message.Response;
 import common.Message.Status;
 import common.Prompt;
 import common.Protocol;
+import common.Style;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -67,7 +68,7 @@ public class Server implements AutoCloseable {
 
     /** Loop de recebimento: executa até que {@link #close()} seja chamado. */
     public void run() throws IOException {
-        log("listening on UDP port " + socket.getLocalPort() + ", storing files in " + storageDir);
+        log(Style.CYAN, "listening on UDP port " + socket.getLocalPort() + ", storing files in " + storageDir);
 
         try {
             while (true) {
@@ -77,7 +78,7 @@ public class Server implements AutoCloseable {
                 } catch (SocketTimeoutException e) {
                 } catch (ProtocolException e) {
                     // datagrama inválido ou upload rejeitado
-                    log(e.getMessage());
+                    log(Style.YELLOW, e.getMessage());
                 } catch (SocketException e) {
                     if (socket.isClosed()) {
                         return;
@@ -171,7 +172,7 @@ public class Server implements AutoCloseable {
             return;
         }
 
-        log("receiving '" + header.fileName() + "' (" + header.fileSize() + " bytes) from " + from);
+        log(Style.CYAN, "receiving '" + header.fileName() + "' (" + header.fileSize() + " bytes) from " + from);
         send(from, new Ack(HEADER_SEQ));
     }
 
@@ -249,13 +250,13 @@ public class Server implements AutoCloseable {
                 verified = true;
             }
         } catch (IOException e) {
-            log("could not store '" + upload.fileName + "': " + e.getMessage());
+            log(Style.RED, "could not store '" + upload.fileName + "': " + e.getMessage());
         }
 
         if (verified) {
-            log("stored '" + upload.fileName + "' (SHA-1 " + HexFormat.of().formatHex(actualHash) + ")");
+            log(Style.GREEN, "stored '" + upload.fileName + "' (SHA-1 " + HexFormat.of().formatHex(actualHash) + ")");
         } else {
-            log("discarded '" + upload.fileName + "': incomplete file or checksum mismatch");
+            log(Style.YELLOW, "discarded '" + upload.fileName + "': incomplete file or checksum mismatch");
             upload.discard();
         }
 
@@ -298,12 +299,16 @@ public class Server implements AutoCloseable {
         try {
             protocol.send(message, to);
         } catch (IOException e) {
-            log("could not send to " + to + ": " + e.getMessage());
+            log(Style.RED, "could not send to " + to + ": " + e.getMessage());
         }
     }
 
     private static void log(String text) {
-        System.out.println("[" + LocalTime.now().withNano(0) + "] " + text);
+        log(Style.RESET, text);
+    }
+
+    private static void log(String color, String text) {
+        Style.printLine(Style.GRAY + "[" + LocalTime.now().withNano(0) + "] " + Style.RESET + color + text + Style.RESET);
     }
 
     /**
@@ -355,20 +360,27 @@ public class Server implements AutoCloseable {
         Server server;
 
         while (true) {
-            String port = Prompt.ask(input, "Porta", String.valueOf(DEFAULT_PORT));
-            String directory = Prompt.ask(input, "Pasta de armazenamento", DEFAULT_DIRECTORY);
+            String port = Prompt.ask(input, "Porta", null);
+            String directory = Prompt.ask(input, "Pasta de armazenamento", null);
 
             if (port == null || directory == null) {
                 return;
+            }
+
+            if (port.isEmpty()) {
+                port = String.valueOf(DEFAULT_PORT);
+            }
+            if (directory.isEmpty()) {
+                directory = DEFAULT_DIRECTORY;
             }
 
             try {
                 server = new Server(Integer.parseInt(port), Paths.get(directory));
                 break;
             } catch (IllegalArgumentException e) {
-                System.out.println("Porta ou pasta inválida."); // número inválido, porta fora da faixa ou nome de pasta inválido
+                Style.showError("Porta ou pasta inválida."); // número inválido, porta fora da faixa ou nome de pasta inválido
             } catch (IOException e) {
-                System.out.println("Não foi possível iniciar o servidor: " + e.getMessage()); // ex.: porta em uso
+                Style.showError("Não foi possível iniciar o servidor: " + e.getMessage()); // ex.: porta em uso
             }
         }
 
