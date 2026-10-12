@@ -1,6 +1,6 @@
 # Upload de arquivos via UDP (Java)
 
-* Data última atualização: 11/10/2026
+* Data última atualização: 12/10/2026
 * Estudante: Maria Eduarda Bambini
 
 Sistema cliente/servidor em Java que transfere arquivos por protocolo UDP em partes de 1024 bytes. O servidor confere a integridade do arquivo com SHA-1
@@ -8,17 +8,17 @@ e só então o guarda na pasta padrão (`uploads/`).
 
 ## Requisitos, compilação e execução
 
-Java 17 ou superior (testado com JDK 21).
+Java 21 ou superior.
 
 ```bash
 # compilar
 javac -d out src/common/*.java src/server/*.java src/client/*.java
 
-# servidor: java -cp out server.Server <porta> <pasta>
-java -cp out server.Server 5000 uploads
+# servidor
+java -cp out server.Server
 
-# cliente (outro terminal): java -cp out client.Client <host> <porta> <arquivo>
-java -cp out client.Client 127.0.0.1 5000 foto.png
+# cliente (outro terminal)
+java -cp out client.Client
 ```
 
 ## Protocolo
@@ -44,7 +44,9 @@ O nome do arquivo é UTF-8 (até 255 bytes). O maior datagrama é o Data: 1 + 4 
 * **Duplicatas são inofensivas:** o servidor só grava o Data com o `seq` esperado; um `seq` já
   gravado apenas recebe o ACK de novo (o ACK anterior foi perdido); um `seq` à frente é ignorado;
   Request, Header e Checksum repetidos também recebem a mesma resposta de antes;
-* **Sessão por cliente:** identificada pelo endereço (IP:porta), então vários clientes podem enviar ao mesmo tempo;
+* **Sessão por cliente:** identificada pelo endereço (IP:porta), então vários clientes podem enviar ao mesmo tempo.
+  O mesmo cliente pode enviar vários arquivos em sequência, e antes de cada envio ele descarta
+  datagramas atrasados do envio anterior;
 * **Limpeza:** upload parado por 15 s é descartado (o `.part` é apagado).
 
 ### Ressalvas
