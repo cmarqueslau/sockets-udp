@@ -1,3 +1,5 @@
+Aluna: Caroline Marques Lau
+
 ## Sobre o programa
 
 Aplicação de chat P2P em C# que permite enviar e receber mensagens utilizando o protocolo UDP.
