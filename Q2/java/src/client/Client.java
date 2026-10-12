@@ -18,6 +18,7 @@ import common.Message.Response;
 import common.Message.Status;
 import common.Prompt;
 import common.Protocol;
+import common.Style;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -203,9 +204,9 @@ public class Client implements AutoCloseable {
                     return address;
                 }
 
-                System.out.println("Servidor não encontrado: " + host);
+                Style.showError("Servidor não encontrado: " + host);
             } catch (IllegalArgumentException e) { // número inválido ou fora da faixa 0-65535
-                System.out.println("Porta inválida: " + port);
+                Style.showError("Porta inválida: " + port);
             }
         }
     }
