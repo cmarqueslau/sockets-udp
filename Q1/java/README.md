@@ -1,19 +1,13 @@
 # Chat P2P UDP (Java)
 
+* Data última atualização: 11/10/2026
+* Estudante: Maria Eduarda Bambini
+
 Chat peer-to-peer desenvolvido em Java com sockets UDP que permite que dois clientes troquem mensagens entre si. 
 
 ## Requisitos
 
 - **Java 11 ou superior** (JDK)
-
-## Estrutura
-
-| Arquivo | Descrição |
-|---|---|
-| `Main.java` | Classe principal: configuração do peer, menu e envio de mensagens |
-| `Receptor.java` | Thread que recebe e trata as mensagens |
-| `Protocolo.java` | Constantes do protocolo, montagem e decodificação das mensagens |
-| `Mensagem.java` | Classe que representa uma mensagem decodificada |
 
 ## Compilação
 
