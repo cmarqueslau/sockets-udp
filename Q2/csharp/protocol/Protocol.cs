@@ -118,10 +118,15 @@ public class Protocol
             switch (type)
             {
                 case MessageType.REQUEST:
-                    if (packet.Length == 2 &&
-                        packet[1] == (byte)Command.ADDFILE)
+                    if (packet.Length == 2 && packet[1] == (byte)Command.ADDFILE)
                     {
                         Log.Information("Request ADDFILE recebido.");
+
+                        SendAck(remote, 0);
+                    }
+                    else
+                    {
+                        Log.Warning("REQUEST inválido.");
                     }
                     break;
 
@@ -470,38 +475,49 @@ public class Protocol
         throw new TimeoutException(
             "Resposta final do servidor não recebida.");
     }
+
     private bool WaitForFinalResponse()
     {
-        try
-        {
-            IPEndPoint remote = new(IPAddress.Any, 0);
-            byte[] response = udp.Receive(ref remote);
+        IPEndPoint remote = new(IPAddress.Any, 0);
 
-            if (response.Length != 2 || response[0] != 0x02)
+        while (true)
+        {
+            try
             {
-                Log.Warning("Resposta final inválida.");
+                byte[] response = udp.Receive(ref remote);
+
+                if (response.Length != 2 || response[0] != 0x02)
+                {
+                    Log.Debug(
+                        "Pacote inesperado ao aguardar resposta final. " +
+                        "Tamanho: {Length}, tipo: {Type}.",
+                        response.Length,
+                        response.Length > 0 ? response[0] : -1);
+
+                    continue;
+                }
+
+                if (response[1] == 0x01)
+                {
+                    Log.Information("Arquivo recebido com sucesso.");
+                    return true;
+                }
+
+                if (response[1] == 0x02)
+                {
+                    throw new IOException(
+                        "O servidor rejeitou o arquivo.");
+                }
+
+                Log.Warning("Status da resposta final desconhecido.");
                 return false;
             }
-
-            if (response[1] == 0x01)
+            catch (SocketException ex)
+                when (ex.SocketErrorCode == SocketError.TimedOut)
             {
-                Log.Information("Arquivo recebido com sucesso.");
-                return true;
+                Log.Warning(ex, "Timeout aguardando a resposta final.");
+                return false;
             }
-
-            if (response[1] == 0x02)
-            {
-                throw new IOException(
-                    "O servidor rejeitou o arquivo.");
-            }
-
-            Log.Warning("Status da resposta final desconhecido.");
-            return false;
-        }
-        catch (SocketException ex)
-        {
-            Log.Warning(ex, "Timeout aguardando a resposta final.");
-            return false;
         }
     }
 }
