@@ -45,6 +45,7 @@ public class Client implements AutoCloseable {
 
     private static final int ACK_TIMEOUT_MS = 500;
     private static final int MAX_ATTEMPTS = 10;
+    private static final String LOCAL_DIR = "arquivos-cliente";
 
     /** É esperada uma Response em vez de um ACK (números de sequência reais nunca são negativos). */
     private static final long NO_ACK = -1;
@@ -170,10 +171,18 @@ public class Client implements AutoCloseable {
             boolean stored = client.upload(file);
             long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
-            System.out.println((stored ? "OK" : "FAILED (checksum rejected)") + " - " + file.getFileName()
-                    + ", " + elapsedMs + " ms, " + client.retransmissions() + " retransmissions");
+            String summary = file.getFileName() + ", " + elapsedMs + " ms, "
+                    + client.retransmissions() + " retransmissions";
+
+            if (stored) {
+                Style.showSuccess("OK - " + summary);
+            } else {
+                Style.showError("FAILED (checksum rejected) - " + summary);
+            }
+        } catch (NoSuchFileException e) {
+            Style.showError("arquivo não encontrado: " + e.getMessage());
         } catch (IOException e) {
-            System.err.println("upload failed: " + e);
+            Style.showError("upload failed: " + e);
         }
     }
 
@@ -201,7 +210,18 @@ public class Client implements AutoCloseable {
         }
     }
 
-    public static void main(String[] args) {
+        public static void main(String[] args) {
+        Path localDir = Paths.get(LOCAL_DIR).toAbsolutePath().normalize();
+
+        try {
+            Files.createDirectories(localDir);
+        } catch (IOException e) {
+            Style.showError("não foi possível criar a pasta " + localDir + ": " + e.getMessage());
+            return;
+        }
+
+        Style.showInfo("Pasta local: " + localDir + " (coloque aqui os arquivos para enviar)");
+
         Scanner input = new Scanner(System.in);
         InetSocketAddress server = askServerAddress(input);
 
@@ -210,7 +230,7 @@ public class Client implements AutoCloseable {
         }
 
         try (Client client = new Client(server)) {
-            System.out.println("Enviando para " + server + ".");
+            Style.showInfo("Enviando para " + server + ".");
 
             while (true) {
                 String file = Prompt.ask(input, "Arquivo para enviar (ou 'sair')", null);
@@ -220,11 +240,11 @@ public class Client implements AutoCloseable {
                 }
 
                 if (!file.isEmpty()) {
-                    uploadAndReport(client, Paths.get(file));
+                    uploadAndReport(client, localDir.resolve(file));
                 }
             }
         } catch (SocketException e) {
-            System.err.println("Não foi possível abrir o socket: " + e);
+            Style.showError("Não foi possível abrir o socket: " + e);
             System.exit(1);
         }
     }

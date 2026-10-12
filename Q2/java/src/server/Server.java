@@ -355,11 +355,18 @@ public class Server implements AutoCloseable {
         Server server;
 
         while (true) {
-            String port = Prompt.ask(input, "Porta", String.valueOf(DEFAULT_PORT));
-            String directory = Prompt.ask(input, "Pasta de armazenamento", DEFAULT_DIRECTORY);
+            String port = Prompt.ask(input, "Porta", null);
+            String directory = Prompt.ask(input, "Pasta de armazenamento", null);
 
             if (port == null || directory == null) {
                 return;
+            }
+
+            if (port.isEmpty()) {
+                port = String.valueOf(DEFAULT_PORT);
+            }
+            if (directory.isEmpty()) {
+                directory = DEFAULT_DIRECTORY;
             }
 
             try {
